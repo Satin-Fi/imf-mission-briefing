@@ -450,6 +450,7 @@ body.explosion-flash {
   }
 
   function playCountdownStartAlarm() {
+    vibrate(VIBRATE.countdownStart);
     playCountdownTone(520, 0.14, 0.16);
     setTimeout(function () {
       playCountdownTone(780, 0.18, 0.14);
@@ -457,6 +458,7 @@ body.explosion-flash {
   }
 
   function playSecondTick(remaining) {
+    vibrate(VIBRATE.countdownTick);
     const urgency = 1 - remaining / COUNTDOWN_MS;
     playCountdownTone(640 + urgency * 520, 0.09, 0.12 + urgency * 0.08);
   }
@@ -471,6 +473,43 @@ body.explosion-flash {
       clearInterval(countdownTimer);
       countdownTimer = null;
     }
+  }
+
+  function vibrate(pattern) {
+    if (!navigator.vibrate) return;
+    try {
+      navigator.vibrate(pattern);
+    } catch (err) {}
+  }
+
+  const VIBRATE = {
+    accept: [50, 40, 100],
+    alert: [30, 25, 55],
+    briefing: [15],
+    warning: [40, 30, 40, 30, 70],
+    objective: [20, 15, 25],
+    countdownStart: [60, 40, 80],
+    countdownTick: [22],
+    countdownFinal: [35, 20, 35],
+    explode: [200, 100, 200, 100, 500]
+  };
+
+  function getBlockVibration(block) {
+    const hasAlert = block.lines.some(function (line) {
+      return line.className === "alert";
+    });
+    const hasObjective = block.lines.some(function (line) {
+      return line.className === "objective";
+    });
+
+    if (hasAlert) {
+      const text = (block.lines[0] && block.lines[0].text) || "";
+      if (/WARNING/i.test(text)) return VIBRATE.warning;
+      return VIBRATE.alert;
+    }
+    if (hasObjective) return VIBRATE.objective;
+    if (block.speech) return VIBRATE.briefing;
+    return null;
   }
 
   const MALE_VOICE_NAMES = [
@@ -688,6 +727,8 @@ body.explosion-flash {
     if (missionStarted) return;
     missionStarted = true;
 
+    vibrate(VIBRATE.accept);
+
     startScreen.style.display = "none";
     mainContainer.hidden = false;
 
@@ -764,6 +805,9 @@ body.explosion-flash {
     const block = blocks[currentBlock];
     currentBlock += 1;
 
+    const blockVibe = getBlockVibration(block);
+    if (blockVibe) vibrate(blockVibe);
+
     const totalChars = getBlockCharCount(block);
     const speechText = block.speech;
     const estimatedMs = speechText
@@ -837,6 +881,7 @@ body.explosion-flash {
     let remaining = COUNTDOWN_MS;
     let lastSecond = Math.ceil(remaining / 1000);
     let lastFastTick = -1;
+    let finalSecondPulse = false;
 
     countdownEl.innerHTML =
       '<div class="timer-box">' + formatCountdown(remaining) + "</div>" +
@@ -857,6 +902,10 @@ body.explosion-flash {
       }
 
       if (remaining <= 1000 && remaining > 0) {
+        if (!finalSecondPulse) {
+          finalSecondPulse = true;
+          vibrate(VIBRATE.countdownFinal);
+        }
         const tick = Math.floor(remaining / 100);
         if (tick !== lastFastTick) {
           lastFastTick = tick;
@@ -881,9 +930,7 @@ body.explosion-flash {
     boom.currentTime = 0;
     boom.play().catch(function () {});
 
-    if (navigator.vibrate) {
-      navigator.vibrate([200, 100, 200, 100, 500]);
-    }
+    vibrate(VIBRATE.explode);
 
     document.body.classList.add("explosion-flash");
     setTimeout(function () {
