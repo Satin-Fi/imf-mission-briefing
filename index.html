@@ -473,6 +473,75 @@ body.explosion-flash {
     }
   }
 
+  const MALE_VOICE_NAMES = [
+    "Daniel",
+    "Arthur",
+    "Aaron",
+    "Martin",
+    "Gordon",
+    "Fred",
+    "David",
+    "Mark",
+    "James",
+    "Tom",
+    "Rishi",
+    "Microsoft David",
+    "Microsoft Mark",
+    "Google UK English Male",
+    "Google US English Male"
+  ];
+
+  const MALE_VOICE_PATTERN =
+    /daniel|arthur|aaron|martin|gordon|fred|david|mark|james|tom|rishi|paul|lee|oliver|nathan|ralph|bruce|microsoft david|microsoft mark|google uk english male|google us english male|english male|en-gb.*male|\bmale\b/i;
+
+  const FEMALE_VOICE_PATTERN =
+    /samantha|karen|victoria|moira|tessa|fiona|kate|serena|zira|susan|hazel|laura|aria|jenny|emma|salli|joanna|ivy|kimberly|kendra|amy|nicole|female|allison|ava|susan|veena|sin-ji|yuna|mei-jia|melina|ellen/i;
+
+  function isEnglishVoice(voice) {
+    return voice.lang && voice.lang.toLowerCase().indexOf("en") === 0;
+  }
+
+  function isFemaleVoice(voice) {
+    return FEMALE_VOICE_PATTERN.test(voice.name);
+  }
+
+  function isMaleVoice(voice) {
+    if (isFemaleVoice(voice)) return false;
+    if (MALE_VOICE_PATTERN.test(voice.name)) return true;
+    return MALE_VOICE_NAMES.some(function (name) {
+      return voice.name.indexOf(name) !== -1;
+    });
+  }
+
+  function pickVoice() {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+
+    const englishVoices = voices.filter(isEnglishVoice);
+
+    let chosen =
+      MALE_VOICE_NAMES.map(function (name) {
+        return englishVoices.find(function (v) {
+          return v.name === name || v.name.indexOf(name) !== -1;
+        });
+      }).find(Boolean) ||
+      englishVoices.find(isMaleVoice);
+
+    if (!chosen) {
+      chosen = englishVoices.find(function (v) {
+        return !isFemaleVoice(v) && v.localService;
+      });
+    }
+
+    if (!chosen) {
+      chosen = englishVoices.find(function (v) {
+        return !isFemaleVoice(v);
+      });
+    }
+
+    preferredVoice = chosen || null;
+  }
+
   function ensureVoices() {
     return new Promise(function (resolve) {
       if (!("speechSynthesis" in window)) {
@@ -480,40 +549,33 @@ body.explosion-flash {
         return;
       }
 
-      function pickVoice() {
-        const voices = speechSynthesis.getVoices();
-        if (!voices.length) return;
+      let resolved = false;
 
-        preferredVoice =
-          voices.find(function (v) {
-            return /Microsoft David|Microsoft Mark|Google UK English Male|Daniel|Aaron|Fred|David|Mark/i.test(v.name);
-          }) ||
-          voices.find(function (v) {
-            return v.lang.startsWith("en") && /male|david|mark|daniel|fred|aaron/i.test(v.name);
-          }) ||
-          voices.find(function (v) {
-            return v.lang.startsWith("en") && v.localService;
-          }) ||
-          voices.find(function (v) {
-            return v.lang.startsWith("en");
-          }) ||
-          voices[0];
+      function finish() {
+        if (resolved) return;
+        resolved = true;
+        pickVoice();
+        resolve();
       }
 
       pickVoice();
 
       if (speechSynthesis.getVoices().length) {
-        resolve();
+        finish();
         return;
       }
 
       speechSynthesis.onvoiceschanged = function () {
         pickVoice();
-        resolve();
+        finish();
       };
 
-      setTimeout(resolve, 400);
+      setTimeout(finish, /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 900 : 500);
     });
+  }
+
+  function refreshVoiceBeforeSpeak() {
+    pickVoice();
   }
 
   function startSpeechKeepAlive() {
@@ -566,11 +628,13 @@ body.explosion-flash {
       }
 
       duckMusic(true);
+      refreshVoiceBeforeSpeak();
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = SPEECH_RATE;
-      utterance.pitch = SPEECH_PITCH;
+      utterance.pitch = preferredVoice ? SPEECH_PITCH : 0.82;
       utterance.volume = 1;
+      utterance.lang = "en-US";
       if (preferredVoice) utterance.voice = preferredVoice;
 
       let finished = false;
