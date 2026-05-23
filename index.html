@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#000000" />
+<title>IMF Classified Transmission</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  background: #000;
+  color: #00ff88;
+  font-family: "Share Tech Mono", "Courier New", monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.75) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.container {
+  width: 92%;
+  max-width: 850px;
+  position: relative;
+  z-index: 2;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.container:not(.countdown-phase) {
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+
+.container::-webkit-scrollbar {
+  display: none;
+}
+
+.top {
+  color: #ff2222;
+  font-size: clamp(11px, 2.8vw, 14px);
+  letter-spacing: 4px;
+  margin-bottom: 20px;
+  animation: blink 1s infinite;
+  text-shadow: 0 0 8px rgba(255, 34, 34, 0.6);
+  transition: opacity 0.5s ease;
+}
+
+@keyframes blink {
+  50% { opacity: 0.35; }
+}
+
+.message {
+  white-space: pre-line;
+  line-height: 1.85;
+  font-size: clamp(15px, 4.2vw, 18px);
+  min-height: min(420px, 55dvh);
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.35);
+  transition: opacity 0.5s ease;
+}
+
+.top.hidden,
+.message.hidden {
+  display: none;
+}
+
+.container.countdown-phase {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+.container.countdown-phase .countdown {
+  margin-top: 0;
+}
+
+.message .line {
+  min-height: 1.85em;
+}
+
+.message .line.alert {
+  color: #ff4444;
+  text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+}
+
+.message .line.objective {
+  color: #00ffcc;
+}
+
+.message .cursor {
+  display: inline-block;
+  width: 0.55em;
+  animation: cursorBlink 0.8s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  50% { opacity: 0; }
+}
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+  padding: 24px;
+}
+
+.start-label {
+  color: #ff2222;
+  font-size: clamp(10px, 2.5vw, 12px);
+  letter-spacing: 6px;
+  margin-bottom: 28px;
+  opacity: 0.7;
+  animation: blink 1.4s infinite;
+}
+
+.start-btn {
+  border: 2px solid #00ff88;
+  padding: clamp(16px, 4vw, 20px) clamp(24px, 6vw, 35px);
+  font-size: clamp(16px, 4.5vw, 20px);
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+  text-align: center;
+  touch-action: manipulation;
+}
+
+.start-btn:active,
+.start-btn:hover {
+  background: #00ff88;
+  color: #000;
+  box-shadow: 0 0 25px #00ff88, 0 0 60px rgba(0, 255, 136, 0.25);
+}
+
+.countdown {
+  margin-top: 32px;
+  text-align: center;
+  display: none;
+  animation: fadeIn 0.6s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.timer-box {
+  background: linear-gradient(180deg, #cc0018 0%, #990014 100%);
+  color: #fff;
+  padding: clamp(14px, 3.5vw, 18px) clamp(28px, 7vw, 40px);
+  display: inline-block;
+  font-size: clamp(28px, 8vw, 42px);
+  letter-spacing: 3px;
+  border-right: 12px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 0 30px rgba(255, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  font-family: "Share Tech Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.destruct-text {
+  color: #fff;
+  margin-top: 18px;
+  letter-spacing: 4px;
+  font-size: clamp(11px, 2.8vw, 14px);
+  animation: blink 0.7s infinite;
+}
+
+.final-screen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  z-index: 100;
+  color: #ff2222;
+  text-align: center;
+  padding: 24px;
+}
+
+.glitch {
+  font-size: clamp(28px, 7vw, 48px);
+  letter-spacing: 3px;
+  line-height: 1.4;
+  animation: glitch 0.12s infinite;
+  text-shadow: 2px 0 #ff0044, -2px 0 #00ff88;
+}
+
+@keyframes glitch {
+  0%   { transform: translate(2px, 0); }
+  25%  { transform: translate(-2px, 2px); }
+  50%  { transform: translate(2px, -2px); }
+  75%  { transform: translate(-2px, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+.flash {
+  animation: flash 0.2s infinite;
+}
+
+@keyframes flash {
+  50% { background: #160000; }
+}
+
+body.explosion-flash {
+  background: #fff !important;
+}
+</style>
+</head>
+<body>
+
+<div class="scanlines" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<div class="start-screen" id="startScreen">
+  <div class="start-label">CLASSIFIED // EYES ONLY</div>
+  <div class="start-btn" id="startBtn" role="button" tabindex="0">TAP TO ACCEPT MISSION</div>
+</div>
+
+<div class="container" id="mainContainer" hidden>
+  <div class="top">SECURE IMF TRANSMISSION</div>
+  <div class="message" id="message" aria-live="polite"></div>
+  <div class="countdown" id="countdown"></div>
+</div>
+
+<div class="final-screen flash" id="finalScreen">
+  <div class="glitch">
+    THIS MESSAGE<br />
+    HAS SELF-DESTRUCTED
+  </div>
+</div>
+
+<audio id="theme" preload="auto" loop crossorigin="anonymous">
+  <source src="https://archive.org/download/tvtunes_455/Mission%20Impossible.mp3" type="audio/mpeg" />
+</audio>
+
+<audio id="boom" preload="auto" crossorigin="anonymous">
+  <source src="https://archive.org/download/Red_Library_Explosions/R09-53-Huge%20Explosion.mp3" type="audio/mpeg" />
+</audio>
+
+<script>
+(function () {
+  "use strict";
+
+  const blocks = [
+    {
+      lines: [
+        { text: "ENCRYPTION LEVEL: OMEGA", className: "alert" },
+        { text: "" }
+      ],
+      speech: "Encryption level. Omega.",
+      pauseAfter: 200
+    },
+    {
+      lines: [{ text: "Agent," }, { text: "" }],
+      speech: "Agent.",
+      pauseAfter: 160
+    },
+    {
+      lines: [
+        { text: "Your primary system has suffered" },
+        { text: "a critical boot failure." },
+        { text: "" }
+      ],
+      speech: "Your primary system has suffered a critical boot failure.",
+      pauseAfter: 200
+    },
+    {
+      lines: [
+        { text: "Standard recovery protocols" },
+        { text: "have been compromised." },
+        { text: "" }
+      ],
+      speech: "Standard recovery protocols have been compromised.",
+      pauseAfter: 200
+    },
+    {
+      lines: [
+        { text: "Conventional repair methods" },
+        { text: "are no longer viable." },
+        { text: "" }
+      ],
+      speech: "Conventional repair methods are no longer viable.",
+      pauseAfter: 200
+    },
+    {
+      lines: [
+        { text: "To restore operational capability," },
+        { text: "you have been provided with a" },
+        { text: "classified recovery device." },
+        { text: "" }
+      ],
+      speech: "To restore operational capability, you have been provided with a classified recovery device.",
+      pauseAfter: 220
+    },
+    {
+      lines: [{ text: "MISSION OBJECTIVE:", className: "alert" }, { text: "" }],
+      speech: "Mission objective.",
+      pauseAfter: 180
+    },
+    {
+      lines: [
+        { text: "1. Insert the recovery drive", className: "objective" },
+        { text: "2. Access boot menu", className: "objective" },
+        { text: "3. Initiate recovery sequence", className: "objective" },
+        { text: "4. Save the machine", className: "objective" },
+        { text: "" }
+      ],
+      speech: "One. Insert the recovery drive. Two. Access boot menu. Three. Initiate recovery sequence. Four. Save the machine.",
+      pauseAfter: 240
+    },
+    {
+      lines: [{ text: "WARNING:", className: "alert" }, { text: "" }],
+      speech: "Warning.",
+      pauseAfter: 180
+    },
+    {
+      lines: [
+        { text: "Failure to execute instructions" },
+        { text: "correctly may result in complete" },
+        { text: "system collapse." },
+        { text: "" }
+      ],
+      speech: "Failure to execute instructions correctly may result in complete system collapse.",
+      pauseAfter: 220
+    },
+    {
+      lines: [
+        { text: "This message will self-destruct" },
+        { text: "in 5 seconds." },
+        { text: "" }
+      ],
+      speech: "This message will self destruct in five seconds.",
+      pauseAfter: 200
+    },
+    {
+      lines: [{ text: "Good luck, Agent." }],
+      speech: "Good luck, Agent.",
+      pauseAfter: 280
+    }
+  ];
+
+  const COUNTDOWN_MS = 5000;
+  const COUNTDOWN_TICK_MS = 10;
+  const CLEAR_DELAY_MS = 400;
+  const SPEECH_RATE = 1.05;
+  const SPEECH_PITCH = 0.94;
+  const TYPE_SPEED_FACTOR = 0.68;
+  const MIN_CHAR_DELAY = 10;
+  const MAX_CHAR_DELAY = 28;
+  const DEFAULT_PAUSE_MS = 120;
+  const MUSIC_VOLUME = 0.58;
+  const MUSIC_DUCK_VOLUME = 0.22;
+
+  const startScreen = document.getElementById("startScreen");
+  const startBtn = document.getElementById("startBtn");
+  const mainContainer = document.getElementById("mainContainer");
+  const messageEl = document.getElementById("message");
+  const topEl = document.querySelector(".top");
+  const countdownEl = document.getElementById("countdown");
+  const finalScreen = document.getElementById("finalScreen");
+  const theme = document.getElementById("theme");
+  const boom = document.getElementById("boom");
+
+  let currentBlock = 0;
+  let missionStarted = false;
+  let preferredVoice = null;
+  let speechKeepAlive = null;
+  let countdownTimer = null;
+  let audioCtx = null;
+
+  function initAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function playCountdownTone(frequency, duration, volume) {
+    const ctx = initAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+
+  function playCountdownStartAlarm() {
+    playCountdownTone(520, 0.14, 0.16);
+    setTimeout(function () {
+      playCountdownTone(780, 0.18, 0.14);
+    }, 130);
+  }
+
+  function playSecondTick(remaining) {
+    const urgency = 1 - remaining / COUNTDOWN_MS;
+    playCountdownTone(640 + urgency * 520, 0.09, 0.12 + urgency * 0.08);
+  }
+
+  function playFinalTick(remaining) {
+    const urgency = 1 - remaining / 1000;
+    playCountdownTone(980 + urgency * 280, 0.05, 0.16 + urgency * 0.1);
+  }
+
+  function stopCountdownTimer() {
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  }
+
+  function ensureVoices() {
+    return new Promise(function (resolve) {
+      if (!("speechSynthesis" in window)) {
+        resolve();
+        return;
+      }
+
+      function pickVoice() {
+        const voices = speechSynthesis.getVoices();
+        if (!voices.length) return;
+
+        preferredVoice =
+          voices.find(function (v) {
+            return /Microsoft David|Microsoft Mark|Google UK English Male|Daniel|Aaron|Fred|David|Mark/i.test(v.name);
+          }) ||
+          voices.find(function (v) {
+            return v.lang.startsWith("en") && /male|david|mark|daniel|fred|aaron/i.test(v.name);
+          }) ||
+          voices.find(function (v) {
+            return v.lang.startsWith("en") && v.localService;
+          }) ||
+          voices.find(function (v) {
+            return v.lang.startsWith("en");
+          }) ||
+          voices[0];
+      }
+
+      pickVoice();
+
+      if (speechSynthesis.getVoices().length) {
+        resolve();
+        return;
+      }
+
+      speechSynthesis.onvoiceschanged = function () {
+        pickVoice();
+        resolve();
+      };
+
+      setTimeout(resolve, 400);
+    });
+  }
+
+  function startSpeechKeepAlive() {
+    if (speechKeepAlive) return;
+    speechKeepAlive = setInterval(function () {
+      if (speechSynthesis.speaking && speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+    }, 4000);
+  }
+
+  function stopSpeechKeepAlive() {
+    if (!speechKeepAlive) return;
+    clearInterval(speechKeepAlive);
+    speechKeepAlive = null;
+  }
+
+  function duckMusic(active) {
+    theme.volume = active ? MUSIC_DUCK_VOLUME : MUSIC_VOLUME;
+  }
+
+  function startThemeMusic() {
+    theme.loop = true;
+    theme.volume = MUSIC_VOLUME;
+    theme.currentTime = 0;
+
+    const playAttempt = theme.play();
+    if (playAttempt && playAttempt.catch) {
+      playAttempt.catch(function () {
+        document.addEventListener("pointerup", function retryTheme() {
+          theme.play().catch(function () {});
+        }, { once: true });
+      });
+    }
+  }
+
+
+  function estimateSpeechDuration(text, rate) {
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    if (!words) return 0;
+    const punctuation = (text.match(/[.,!?;:]/g) || []).length;
+    return (words * 300 + punctuation * 80 + 120) / rate;
+  }
+
+  function speakText(text) {
+    return new Promise(function (resolve) {
+      if (!text || !text.trim() || !("speechSynthesis" in window)) {
+        resolve();
+        return;
+      }
+
+      duckMusic(true);
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = SPEECH_RATE;
+      utterance.pitch = SPEECH_PITCH;
+      utterance.volume = 1;
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      let finished = false;
+
+      function done() {
+        if (finished) return;
+        finished = true;
+        duckMusic(false);
+        resolve();
+      }
+
+      utterance.onend = done;
+      utterance.onerror = done;
+
+      speechSynthesis.speak(utterance);
+
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+
+      const wordCount = text.trim().split(/\s+/).length;
+      const fallbackMs = Math.max(
+        estimateSpeechDuration(text, SPEECH_RATE) + 400,
+        wordCount * 520
+      );
+      setTimeout(function () {
+        if (!finished) done();
+      }, fallbackMs);
+    });
+  }
+
+  function requestFullscreen() {
+    const el = document.documentElement;
+    const request =
+      el.requestFullscreen ||
+      el.webkitRequestFullscreen ||
+      el.msRequestFullscreen;
+
+    if (request) {
+      request.call(el).catch(function () {});
+    }
+
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("portrait").catch(function () {});
+    }
+
+    window.scrollTo(0, 1);
+  }
+
+  function startMission() {
+    if (missionStarted) return;
+    missionStarted = true;
+
+    startScreen.style.display = "none";
+    mainContainer.hidden = false;
+
+    requestFullscreen();
+
+    startThemeMusic();
+
+    initAudioContext();
+    startSpeechKeepAlive();
+
+    ensureVoices().then(function () {
+      showNextBlock();
+    });
+  }
+
+  function getBlockCharCount(block) {
+    return block.lines.reduce(function (total, line) {
+      return total + line.text.length;
+    }, 0);
+  }
+
+  function scrollToLatest(smooth) {
+    requestAnimationFrame(function () {
+      mainContainer.scrollTo({
+        top: mainContainer.scrollHeight,
+        behavior: smooth ? "auto" : "auto"
+      });
+    });
+  }
+
+  function typeLine(line, charDelay) {
+    return new Promise(function (resolve) {
+      const lineDiv = document.createElement("div");
+      lineDiv.className = "line" + (line.className ? " " + line.className : "");
+      messageEl.appendChild(lineDiv);
+      scrollToLatest(true);
+
+      const text = line.text;
+      if (!text.length) {
+        resolve();
+        return;
+      }
+
+      const cursor = document.createElement("span");
+      cursor.className = "cursor";
+      cursor.textContent = "\u258E";
+      lineDiv.appendChild(cursor);
+
+      let charIndex = 0;
+
+      function typeChar() {
+        if (charIndex < text.length) {
+          cursor.before(text.charAt(charIndex));
+          charIndex += 1;
+          scrollToLatest(false);
+          setTimeout(typeChar, charDelay);
+        } else {
+          cursor.remove();
+          scrollToLatest(true);
+          resolve();
+        }
+      }
+
+      typeChar();
+    });
+  }
+
+  function showNextBlock() {
+    if (currentBlock >= blocks.length) {
+      setTimeout(clearMessagesAndCountdown, 450);
+      return;
+    }
+
+    const block = blocks[currentBlock];
+    currentBlock += 1;
+
+    const totalChars = getBlockCharCount(block);
+    const speechText = block.speech;
+    const estimatedMs = speechText
+      ? estimateSpeechDuration(speechText, SPEECH_RATE)
+      : Math.max(80, totalChars * 18);
+    const charDelay = totalChars
+      ? Math.max(
+          MIN_CHAR_DELAY,
+          Math.min(MAX_CHAR_DELAY, (estimatedMs * TYPE_SPEED_FACTOR) / totalChars)
+        )
+      : 0;
+
+    let typingDone = false;
+    let speechDone = !speechText;
+    let advanced = false;
+
+    function finishBlock() {
+      if (!typingDone || !speechDone || advanced) return;
+      advanced = true;
+      const pause = block.pauseAfter != null ? block.pauseAfter : DEFAULT_PAUSE_MS;
+      setTimeout(showNextBlock, pause);
+    }
+
+    if (speechText) {
+      speakText(speechText).then(function () {
+        speechDone = true;
+        finishBlock();
+      });
+    }
+
+    (async function typeBlock() {
+      for (let i = 0; i < block.lines.length; i += 1) {
+        const line = block.lines[i];
+        const delay = line.text.length ? charDelay : 0;
+        await typeLine(line, delay);
+      }
+      typingDone = true;
+      finishBlock();
+    })();
+  }
+
+  function clearMessagesAndCountdown() {
+    messageEl.style.opacity = "0";
+    if (topEl) topEl.style.opacity = "0";
+
+    setTimeout(function () {
+      messageEl.innerHTML = "";
+      messageEl.classList.add("hidden");
+      if (topEl) topEl.classList.add("hidden");
+      mainContainer.classList.add("countdown-phase");
+      startCountdown();
+    }, CLEAR_DELAY_MS);
+  }
+
+  function formatCountdown(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const centiseconds = Math.floor((ms % 1000) / 10);
+    return (
+      "-00:00:" +
+      String(totalSeconds).padStart(2, "0") +
+      ":" +
+      String(centiseconds).padStart(2, "0")
+    );
+  }
+
+  function startCountdown() {
+    countdownEl.style.display = "block";
+    duckMusic(true);
+    playCountdownStartAlarm();
+
+    let remaining = COUNTDOWN_MS;
+    let lastSecond = Math.ceil(remaining / 1000);
+    let lastFastTick = -1;
+
+    countdownEl.innerHTML =
+      '<div class="timer-box">' + formatCountdown(remaining) + "</div>" +
+      '<div class="destruct-text">SELF-DESTRUCT SEQUENCE INITIATED...</div>';
+
+    stopCountdownTimer();
+
+    countdownTimer = setInterval(function () {
+      remaining -= COUNTDOWN_TICK_MS;
+
+      const box = countdownEl.querySelector(".timer-box");
+      if (box) box.textContent = formatCountdown(Math.max(remaining, 0));
+
+      const currentSecond = Math.ceil(Math.max(remaining, 1) / 1000);
+      if (currentSecond !== lastSecond && remaining > 0) {
+        lastSecond = currentSecond;
+        playSecondTick(remaining);
+      }
+
+      if (remaining <= 1000 && remaining > 0) {
+        const tick = Math.floor(remaining / 100);
+        if (tick !== lastFastTick) {
+          lastFastTick = tick;
+          playFinalTick(remaining);
+        }
+      }
+
+      if (remaining <= 0) {
+        stopCountdownTimer();
+        triggerDestruction();
+      }
+    }, COUNTDOWN_TICK_MS);
+  }
+
+  function triggerDestruction() {
+    stopCountdownTimer();
+    stopSpeechKeepAlive();
+    speechSynthesis.cancel();
+    duckMusic(false);
+    theme.pause();
+
+    boom.currentTime = 0;
+    boom.play().catch(function () {});
+
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 500]);
+    }
+
+    document.body.classList.add("explosion-flash");
+    setTimeout(function () {
+      document.body.classList.remove("explosion-flash");
+    }, 140);
+
+    setTimeout(function () {
+      mainContainer.hidden = true;
+      finalScreen.style.display = "flex";
+    }, 160);
+  }
+
+  function bindStart() {
+    function handleStart(e) {
+      if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+      if (e.type === "keydown") e.preventDefault();
+      startMission();
+    }
+
+    startBtn.addEventListener("click", handleStart);
+    startBtn.addEventListener("touchend", handleStart, { passive: true });
+    startBtn.addEventListener("keydown", handleStart);
+    startScreen.addEventListener("click", function (e) {
+      if (e.target === startScreen) handleStart(e);
+    });
+  }
+
+  bindStart();
+})();
+</script>
+</body>
+</html>
