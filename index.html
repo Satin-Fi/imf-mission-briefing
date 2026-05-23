@@ -255,6 +255,22 @@ body {
 body.explosion-flash {
   background: #fff !important;
 }
+
+@keyframes hapticPulse {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+  40% {
+    box-shadow: inset 0 0 120px 8px rgba(0, 255, 136, 0.22);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+}
+
+body.haptic-pulse {
+  animation: hapticPulse 0.22s ease-out;
+}
 </style>
 </head>
 <body>
@@ -418,6 +434,8 @@ body.explosion-flash {
   let speechKeepAlive = null;
   let countdownTimer = null;
   let audioCtx = null;
+  let hapticsUnlocked = false;
+  let lastVibeEnd = 0;
 
   function initAudioContext() {
     if (!audioCtx) {
@@ -475,42 +493,62 @@ body.explosion-flash {
     }
   }
 
+  function supportsVibration() {
+    return typeof navigator.vibrate === "function";
+  }
+
+  function hapticVisualPulse() {
+    document.body.classList.remove("haptic-pulse");
+    void document.body.offsetWidth;
+    document.body.classList.add("haptic-pulse");
+    setTimeout(function () {
+      document.body.classList.remove("haptic-pulse");
+    }, 240);
+  }
+
+  function unlockHaptics() {
+    hapticsUnlocked = true;
+    if (!supportsVibration()) return false;
+    return navigator.vibrate(30);
+  }
+
   function vibrate(pattern) {
-    if (!navigator.vibrate) return;
-    try {
-      navigator.vibrate(pattern);
-    } catch (err) {}
+    if (!pattern || !pattern.length) return;
+
+    if (!supportsVibration()) {
+      hapticVisualPulse();
+      return false;
+    }
+
+    const duration = pattern.reduce(function (sum, ms) {
+      return sum + ms;
+    }, 0);
+    const now = Date.now();
+
+    if (now < lastVibeEnd - 20) {
+      return false;
+    }
+
+    const ok = navigator.vibrate(pattern);
+    if (ok) {
+      lastVibeEnd = now + duration;
+      return true;
+    }
+
+    hapticVisualPulse();
+    return false;
   }
 
   const VIBRATE = {
-    accept: [50, 40, 100],
-    alert: [30, 25, 55],
-    briefing: [15],
-    warning: [40, 30, 40, 30, 70],
-    objective: [20, 15, 25],
-    countdownStart: [60, 40, 80],
-    countdownTick: [22],
-    countdownFinal: [35, 20, 35],
-    explode: [200, 100, 200, 100, 500]
+    accept: [140, 90, 220],
+    alert: [110, 80, 180],
+    warning: [140, 70, 140, 70, 240],
+    objective: [90, 60, 130],
+    countdownStart: [180, 110, 260],
+    countdownTick: [90],
+    countdownFinal: [120, 70, 120, 70, 200],
+    explode: [350, 180, 450, 180, 700]
   };
-
-  function getBlockVibration(block) {
-    const hasAlert = block.lines.some(function (line) {
-      return line.className === "alert";
-    });
-    const hasObjective = block.lines.some(function (line) {
-      return line.className === "objective";
-    });
-
-    if (hasAlert) {
-      const text = (block.lines[0] && block.lines[0].text) || "";
-      if (/WARNING/i.test(text)) return VIBRATE.warning;
-      return VIBRATE.alert;
-    }
-    if (hasObjective) return VIBRATE.objective;
-    if (block.speech) return VIBRATE.briefing;
-    return null;
-  }
 
   const MALE_VOICE_NAMES = [
     "Daniel",
@@ -676,6 +714,28 @@ body.explosion-flash {
       utterance.lang = "en-US";
       if (preferredVoice) utterance.voice = preferredVoice;
 
+      if (/WARNING/i.test(text)) {
+        utterance.onstart = function () {
+          vibrate(VIBRATE.warning);
+        };
+      } else if (/MISSION OBJECTIVE|OMEGA/i.test(text)) {
+        utterance.onstart = function () {
+          vibrate(VIBRATE.alert);
+        };
+      } else if (/One\. Insert the recovery/i.test(text)) {
+        utterance.onstart = function () {
+          vibrate(VIBRATE.objective);
+        };
+      } else if (/Good luck/i.test(text)) {
+        utterance.onstart = function () {
+          vibrate([100, 70, 140]);
+        };
+      } else {
+        utterance.onstart = function () {
+          vibrate([70]);
+        };
+      }
+
       let finished = false;
 
       function done() {
@@ -726,8 +786,6 @@ body.explosion-flash {
   function startMission() {
     if (missionStarted) return;
     missionStarted = true;
-
-    vibrate(VIBRATE.accept);
 
     startScreen.style.display = "none";
     mainContainer.hidden = false;
@@ -804,9 +862,6 @@ body.explosion-flash {
 
     const block = blocks[currentBlock];
     currentBlock += 1;
-
-    const blockVibe = getBlockVibration(block);
-    if (blockVibe) vibrate(blockVibe);
 
     const totalChars = getBlockCharCount(block);
     const speechText = block.speech;
@@ -947,6 +1002,8 @@ body.explosion-flash {
     function handleStart(e) {
       if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
       if (e.type === "keydown") e.preventDefault();
+      unlockHaptics();
+      vibrate(VIBRATE.accept);
       startMission();
     }
 
